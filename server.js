@@ -7,6 +7,9 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ── TRUST PROXY (required for Railway / reverse proxies) ──
+app.set('trust proxy', 1);
+
 // ── SECURITY ─────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -66,6 +69,20 @@ app.use('/api/jobs',     require('./routes/jobs'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/admin',    require('./routes/admin'));
 app.use('/api/invoices', require('./routes/invoices'));
+
+// ── CONTACT FORM ──────────────────────────────────
+app.post('/api/contact', async (req, res) => {
+  const { name, email, subject, message } = req.body;
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ error: 'All fields required' });
+  }
+  const { sendEmail } = require('./config/email');
+  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAIL;
+  if (adminEmail) {
+    await sendEmail(adminEmail, 'contactForm', { name, email, subject, message });
+  }
+  res.json({ success: true });
+});
 
 // ── HEALTH CHECK ─────────────────────────────────
 app.get('/health', (req, res) => {

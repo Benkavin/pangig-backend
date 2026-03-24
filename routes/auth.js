@@ -65,8 +65,9 @@ router.post('/signup', async (req, res) => {
     }
 
     // Notify admin of new signup (non-blocking)
-    if (process.env.ADMIN_EMAIL) {
-      sendEmail(process.env.ADMIN_EMAIL, 'adminNewSignup', {
+    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+      sendEmail(adminEmail, 'adminNewSignup', {
         userName: user.name,
         userEmail: user.email,
         userRole: role

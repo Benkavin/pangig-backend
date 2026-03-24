@@ -2,7 +2,10 @@
 // PANGIG EMAIL SERVICE — powered by Resend
 // ══════════════════════════════════════════════
 
-const FROM = 'Pangig <notifications@pangig.com>';
+// Send from verified Resend domain until pangig.com DNS is set up
+const FROM = process.env.EMAIL_VERIFIED === 'true'
+  ? 'Pangig <notifications@pangig.com>'
+  : 'Pangig <onboarding@resend.dev>';
 const SITE = process.env.FRONTEND_URL || 'https://www.pangig.com';
 
 // ── Base HTML wrapper ─────────────────────────
@@ -201,6 +204,23 @@ const templates = {
     `)
   }),
 
+  // ── Contact Form ───────────────────────────
+  contactForm: ({ name, email, subject, message }) => ({
+    subject: `New contact form message: ${subject}`,
+    html: baseTemplate(`
+      ${h1('New contact form message 📬')}
+      ${highlight('From', name)}
+      ${highlight('Email', email)}
+      ${highlight('Subject', subject)}
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin:12px 0;">
+        <div style="font-size:13px;color:#6b7280;margin-bottom:8px;">Message:</div>
+        <div style="font-size:14px;color:#0a0c10;line-height:1.7;">${message.replace(/\n/g, '<br>')}</div>
+      </div>
+      ${highlight('Time', new Date().toLocaleString())}
+      <a href="mailto:${email}?subject=Re: ${encodeURIComponent(subject)}" style="background:#f4a623;color:#000000;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:20px;">Reply to ${name}</a>
+    `)
+  }),
+
 };
 
 // ══════════════════════════════════════════════
@@ -216,6 +236,12 @@ async function sendEmail(to, templateName, data) {
     console.error(`[Email] Unknown template: ${templateName}`);
     return;
   }
+
+  // When domain is not verified, Resend only allows sending to
+  // the account owner's email. Route all emails there for now.
+  const domainVerified = process.env.EMAIL_VERIFIED === 'true';
+  const actualTo = domainVerified ? to : (process.env.RESEND_TEST_EMAIL || to);
+
   const { subject, html } = template(data);
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -224,13 +250,13 @@ async function sendEmail(to, templateName, data) {
         'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from: FROM, to, subject, html }),
+      body: JSON.stringify({ from: FROM, to: actualTo, subject, html }),
     });
     const result = await res.json();
     if (!res.ok) {
-      console.error(`[Email] Failed to send ${templateName} to ${to}:`, result);
+      console.error(`[Email] Failed to send ${templateName} to ${actualTo}:`, result);
     } else {
-      console.log(`[Email] Sent ${templateName} to ${to} — id: ${result.id}`);
+      console.log(`[Email] Sent ${templateName} to ${actualTo} — id: ${result.id}`);
     }
   } catch (err) {
     console.error(`[Email] Error sending ${templateName}:`, err.message);
