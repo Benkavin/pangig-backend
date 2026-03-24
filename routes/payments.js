@@ -3,6 +3,7 @@ const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const supabase = require('../config/supabase');
 const { authMiddleware, contractorOnly } = require('../middleware/auth');
+const { sendEmail } = require('../config/email');
 
 const CREDIT_PACKAGES = [
   { id: 'starter', credits: 10, price_usd: 15, label: 'Starter' },
@@ -70,12 +71,13 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
     const session = event.data.object;
     const { user_id, package_id, credits } = session.metadata;
     const creditsToAdd = parseInt(credits);
+    const amountPaid = (session.amount_total / 100).toFixed(2);
 
     try {
-      // Get current credits
+      // Get current user
       const { data: user } = await supabase
         .from('users')
-        .select('credits')
+        .select('credits, name, email')
         .eq('id', user_id)
         .single();
 
@@ -90,12 +92,33 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
         user_id,
         action: `Purchased ${package_id} pack via Stripe`,
         credits: creditsToAdd,
-        amount_paid: session.amount_total / 100,
+        amount_paid: amountPaid,
         currency: 'usd',
         payment_method: 'stripe',
         stripe_session_id: session.id,
         created_at: new Date().toISOString()
       });
+
+      // Email contractor confirmation (non-blocking)
+      if (user?.email) {
+        sendEmail(user.email, 'creditsPurchased', {
+          name: user.name || 'there',
+          packageName: package_id.charAt(0).toUpperCase() + package_id.slice(1),
+          credits: creditsToAdd,
+          amountPaid
+        });
+      }
+
+      // Email admin about payment (non-blocking)
+      if (process.env.ADMIN_EMAIL) {
+        sendEmail(process.env.ADMIN_EMAIL, 'adminNewPayment', {
+          userName: user?.name || 'Unknown',
+          packageName: package_id,
+          credits: creditsToAdd,
+          amountPaid,
+          paymentMethod: 'Stripe'
+        });
+      }
 
       console.log(`Credits added: ${creditsToAdd} for user ${user_id}`);
     } catch (err) {

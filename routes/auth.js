@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const supabase = require('../config/supabase');
 const { authMiddleware } = require('../middleware/auth');
+const { sendEmail } = require('../config/email');
 
 // ── SIGN UP ──────────────────────────────────────
 router.post('/signup', async (req, res) => {
@@ -55,6 +56,22 @@ router.post('/signup', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
+
+    // Send welcome email (non-blocking)
+    if (role === 'client') {
+      sendEmail(user.email, 'clientWelcome', { name: user.name });
+    } else {
+      sendEmail(user.email, 'contractorWelcome', { name: user.name });
+    }
+
+    // Notify admin of new signup (non-blocking)
+    if (process.env.ADMIN_EMAIL) {
+      sendEmail(process.env.ADMIN_EMAIL, 'adminNewSignup', {
+        userName: user.name,
+        userEmail: user.email,
+        userRole: role
+      });
+    }
 
     res.status(201).json({ user, token });
   } catch (err) {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authMiddleware, contractorOnly } = require('../middleware/auth');
+const { sendEmail } = require('../config/email');
 
 // ── GET ALL JOBS (contractors see all, clients see own) ──
 router.get('/', authMiddleware, async (req, res) => {
@@ -75,6 +76,38 @@ router.post('/', authMiddleware, async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // Send job posted confirmation to client (non-blocking)
+    if (client?.email) {
+      sendEmail(client.email, 'jobPosted', {
+        name: req.user.name || 'there',
+        jobTitle: title,
+        jobType: type,
+        location: location || null,
+        budget: budget || null
+      });
+    }
+
+    // Notify contractors whose services match this job type (non-blocking)
+    supabase
+      .from('users')
+      .select('name, email, services')
+      .eq('role', 'contractor')
+      .then(({ data: contractors }) => {
+        if (!contractors) return;
+        const matched = contractors.filter(c => (c.services || []).includes(type));
+        matched.forEach(c => {
+          sendEmail(c.email, 'newJobAlert', {
+            contractorName: c.name,
+            jobTitle: title,
+            jobType: type,
+            location: location || null,
+            budget: budget || null,
+            jobCount: 1
+          });
+        });
+      });
+
     res.status(201).json({ job });
   } catch (err) {
     console.error('Post job error:', err);
@@ -141,6 +174,19 @@ router.post('/:id/unlock', authMiddleware, contractorOnly, async (req, res) => {
       credits: -cost,
       created_at: new Date().toISOString()
     });
+
+    // Notify client that a contractor unlocked their lead (non-blocking)
+    if (job.client_email) {
+      // Get contractor name
+      supabase.from('users').select('name').eq('id', req.user.id).single()
+        .then(({ data: con }) => {
+          sendEmail(job.client_email, 'leadUnlocked', {
+            clientName: 'there',
+            contractorName: con?.name || 'A contractor',
+            jobTitle: job.title
+          });
+        });
+    }
 
     res.json({
       success: true,
