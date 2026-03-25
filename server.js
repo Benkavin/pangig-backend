@@ -75,16 +75,35 @@ app.use('/api/profile',  require('./routes/profile'));
 
 // ── CONTACT FORM ──────────────────────────────────
 app.post('/api/contact', async (req, res) => {
-  const { name, email, subject, message } = req.body;
-  if (!name || !email || !subject || !message) {
-    return res.status(400).json({ error: 'All fields required' });
+  try {
+    const { name, email, subject, message } = req.body;
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ error: 'All fields required' });
+    }
+    const { sendEmail } = require('./config/email');
+
+    // Send to info@pangig.com (the main inbox)
+    // Also CC to admin notify email as backup
+    const recipients = ['info@pangig.com'];
+    const backupEmail = process.env.ADMIN_NOTIFY_EMAIL;
+    if (backupEmail && backupEmail !== 'info@pangig.com') {
+      recipients.push(backupEmail);
+    }
+
+    for (const recipient of recipients) {
+      try {
+        await sendEmail(recipient, 'contactForm', { name, email, subject, message });
+        console.log(`[Contact] Email sent to ${recipient} from ${name} (${email})`);
+      } catch(e) {
+        console.error(`[Contact] Failed to send to ${recipient}:`, e.message);
+      }
+    }
+
+    res.json({ success: true });
+  } catch(err) {
+    console.error('[Contact] Error:', err);
+    res.status(500).json({ error: 'Could not send message. Please try again.' });
   }
-  const { sendEmail } = require('./config/email');
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAIL;
-  if (adminEmail) {
-    await sendEmail(adminEmail, 'contactForm', { name, email, subject, message });
-  }
-  res.json({ success: true });
 });
 
 // ── HEALTH CHECK ─────────────────────────────────

@@ -310,14 +310,18 @@ async function sendEmail(to, templateName, data) {
   const actualTo = domainVerified ? to : (process.env.RESEND_TEST_EMAIL || to);
 
   const { subject, html } = template(data);
+  // Add reply-to for contact forms so you can reply directly to the sender
+  const replyTo = data?.email || null;
   try {
+    const body = { from: FROM, to: actualTo, subject, html };
+    if (replyTo) body.reply_to = replyTo;
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from: FROM, to: actualTo, subject, html }),
+      body: JSON.stringify(body),
     });
     const result = await res.json();
     if (!res.ok) {
