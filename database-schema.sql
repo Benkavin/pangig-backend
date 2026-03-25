@@ -145,3 +145,6 @@ alter table users add column if not exists website text;
 -- Allow service role full access on new tables
 create policy "service_role_all" on password_resets for all using (true);
 create policy "service_role_all" on reviews for all using (true);
+
+-- ── VERIFICATION STATUS ───────────────────────────
+alter table users add column if not exists verification_status text default 'none' check (verification_status in ('none','pending','verified','rejected'));

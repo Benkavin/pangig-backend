@@ -204,6 +204,58 @@ const templates = {
     `)
   }),
 
+  // ── Verification Request (Admin) ──────────
+  verificationRequest: ({ contractorName, contractorEmail, companyName, licenseNumber, yearsExperience }) => ({
+    subject: `Verification request: ${contractorName} — ${companyName}`,
+    html: baseTemplate(`
+      ${h1('New verification request 🛡️')}
+      ${highlight('Contractor', contractorName)}
+      ${highlight('Email', contractorEmail)}
+      ${highlight('Company', companyName)}
+      ${highlight('License #', licenseNumber)}
+      ${highlight('Years Experience', yearsExperience + ' years')}
+      ${highlight('Time', new Date().toLocaleString())}
+      <div style="display:flex;gap:12px;margin-top:20px;">
+        <a href="${SITE}" style="background:#22c55e;color:#fff;font-weight:700;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none;">✅ Approve</a>
+        <a href="${SITE}" style="background:#ef4444;color:#fff;font-weight:700;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none;">❌ Reject</a>
+      </div>
+      ${p('Log into the admin panel to approve or reject this verification request.')}
+    `)
+  }),
+
+  // ── Verification Approved ──────────────────
+  verificationApproved: ({ name }) => ({
+    subject: 'Your Pangig account is now verified! ✅',
+    html: baseTemplate(`
+      ${h1('You\'re verified! 🎉')}
+      ${p(`Congratulations ${name.split(' ')[0]}! Your contractor account has been verified on Pangig.`)}
+      <div style="background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+        <div style="font-size:2rem">✅</div>
+        <div style="font-size:16px;font-weight:700;color:#166534;margin-top:8px;">Verified Contractor</div>
+        <div style="font-size:13px;color:#166534;margin-top:4px;">Your profile now shows a verified badge</div>
+      </div>
+      ${p('Your profile now displays a verified badge on all your lead listings. Verified contractors receive significantly more responses from clients.')}
+      ${btn('Browse Leads Now', SITE)}
+    `)
+  }),
+
+  // ── Verification Rejected ─────────────────
+  verificationRejected: ({ name }) => ({
+    subject: 'Pangig verification update',
+    html: baseTemplate(`
+      ${h1('Verification update')}
+      ${p(`Hi ${name.split(' ')[0]}, unfortunately we were unable to verify your account with the information provided.`)}
+      ${p('This may be because:')}
+      <ul style="font-size:15px;color:#374151;line-height:2;padding-left:20px;">
+        <li>The license number could not be verified</li>
+        <li>The uploaded document was unclear or invalid</li>
+        <li>The business name did not match our records</li>
+      </ul>
+      ${p('Please log in and resubmit your verification with accurate information. If you believe this is an error, contact us at <a href="mailto:info@pangig.com" style="color:#f4a623;">info@pangig.com</a>.')}
+      ${btn('Resubmit Verification', SITE)}
+    `)
+  }),
+
   // ── Password Reset ─────────────────────────
   passwordReset: ({ name, resetLink, expiryHours }) => ({
     subject: 'Reset your Pangig password',
