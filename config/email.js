@@ -204,6 +204,21 @@ const templates = {
     `)
   }),
 
+  // ── Password Reset ─────────────────────────
+  passwordReset: ({ name, resetLink, expiryHours }) => ({
+    subject: 'Reset your Pangig password',
+    html: baseTemplate(`
+      ${h1('Reset your password 🔐')}
+      ${p(`Hi ${name.split(' ')[0]}, we received a request to reset your Pangig password.`)}
+      ${p('Click the button below to set a new password. This link expires in <strong>${expiryHours} hours</strong>.'.replace('${expiryHours}', expiryHours))}
+      ${btn('Reset My Password', resetLink)}
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin:20px 0;">
+        <p style="margin:0;font-size:13px;color:#6b7280;">If you didn't request a password reset, you can safely ignore this email. Your password will not change.</p>
+      </div>
+      ${p('For security, this link will expire in ' + expiryHours + ' hours.')}
+    `)
+  }),
+
   // ── Contact Form ───────────────────────────
   contactForm: ({ name, email, subject, message }) => ({
     subject: `New contact form message: ${subject}`,

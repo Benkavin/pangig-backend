@@ -107,3 +107,41 @@ insert into pricing (service_id, credits) values
   ('massage', 3), ('home-nursing', 6), ('accounting', 6), ('legal', 10),
   ('web-dev', 7), ('consulting', 8)
 on conflict (service_id) do nothing;
+
+-- ── PASSWORD RESETS ───────────────────────────────
+create table if not exists password_resets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade unique,
+  token text not null unique,
+  expires_at timestamptz not null,
+  created_at timestamptz default now()
+);
+create index if not exists idx_password_resets_token on password_resets(token);
+
+-- ── REVIEWS ──────────────────────────────────────
+create table if not exists reviews (
+  id uuid primary key default gen_random_uuid(),
+  contractor_id uuid references users(id) on delete cascade,
+  client_id uuid references users(id) on delete cascade,
+  client_name text not null,
+  rating integer not null check (rating >= 1 and rating <= 5),
+  comment text,
+  created_at timestamptz default now(),
+  unique(contractor_id, client_id)
+);
+create index if not exists idx_reviews_contractor on reviews(contractor_id);
+
+-- ── ADD RATING COLUMNS TO USERS ───────────────────
+alter table users add column if not exists avg_rating numeric(3,2) default 0;
+alter table users add column if not exists review_count integer default 0;
+alter table users add column if not exists verified boolean default false;
+alter table users add column if not exists company_name text;
+alter table users add column if not exists license_number text;
+alter table users add column if not exists years_experience integer;
+alter table users add column if not exists bio text;
+alter table users add column if not exists logo_url text;
+alter table users add column if not exists website text;
+
+-- Allow service role full access on new tables
+create policy "service_role_all" on password_resets for all using (true);
+create policy "service_role_all" on reviews for all using (true);

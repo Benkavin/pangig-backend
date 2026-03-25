@@ -65,10 +65,12 @@ app.use(express.json());
 
 // ── ROUTES ───────────────────────────────────────
 app.use('/api/auth',     require('./routes/auth'));
+app.use('/api/auth',     require('./routes/password'));
 app.use('/api/jobs',     require('./routes/jobs'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/admin',    require('./routes/admin'));
 app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/reviews',  require('./routes/reviews'));
 
 // ── CONTACT FORM ──────────────────────────────────
 app.post('/api/contact', async (req, res) => {
