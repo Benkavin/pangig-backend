@@ -148,3 +148,18 @@ create policy "service_role_all" on reviews for all using (true);
 
 -- ── VERIFICATION STATUS ───────────────────────────
 alter table users add column if not exists verification_status text default 'none' check (verification_status in ('none','pending','verified','rejected'));
+
+-- ── PROMO CODES ───────────────────────────────────
+create table if not exists promo_codes (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique,
+  label text not null,
+  credits integer not null,
+  expiry_date date not null,
+  used_by uuid references users(id) on delete set null,
+  used_by_name text,
+  used_at timestamptz,
+  created_at timestamptz default now()
+);
+create index if not exists idx_promo_codes_code on promo_codes(code);
+create index if not exists idx_promo_codes_used_by on promo_codes(used_by);

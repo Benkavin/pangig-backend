@@ -128,4 +128,57 @@ router.patch('/users/:id/status', async (req, res) => {
   }
 });
 
+// ── PROMO CODES ──────────────────────────────────
+
+// Generate promo codes
+router.post('/promocodes', async (req, res) => {
+  try {
+    const { codes, label, credits, expiry_date } = req.body;
+    if (!codes?.length || !label || !credits || !expiry_date) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const rows = codes.map(code => ({
+      code,
+      label,
+      credits: parseInt(credits),
+      expiry_date,
+      used_by: null,
+      created_at: new Date().toISOString()
+    }));
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .insert(rows)
+      .select();
+    if (error) throw error;
+    res.json({ success: true, codes: data });
+  } catch (err) {
+    console.error('Generate promo codes error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get all promo codes
+router.get('/promocodes', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ codes: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete a promo code
+router.delete('/promocodes/:id', async (req, res) => {
+  try {
+    await supabase.from('promo_codes').delete().eq('id', req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
