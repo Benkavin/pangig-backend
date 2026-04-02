@@ -61,7 +61,9 @@ app.use('/api/auth/', authLimiter);
 // ── BODY PARSING ─────────────────────────────────
 // Stripe webhook needs raw body — must come BEFORE express.json()
 app.use('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json());
+// Increase limit to 10mb to handle base64 profile photos and portfolio images
+app.use(express.json({ limit: '25mb' })); // 25MB for profile photo + portfolio uploads
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ── ROUTES ───────────────────────────────────────
 app.use('/api/auth',     require('./routes/auth'));

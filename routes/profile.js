@@ -26,8 +26,25 @@ router.put('/', authMiddleware, async (req, res) => {
     if (service_areas !== undefined) updates.service_areas = service_areas;
     if (years_experience !== undefined) updates.years_experience = years_experience ? parseInt(years_experience) : null;
     if (availability !== undefined) updates.availability = availability;
-    if (logo_url !== undefined) updates.logo_url = logo_url;
-    if (portfolio !== undefined) updates.portfolio = portfolio;
+
+    // Handle logo_url — warn if too large but still save
+    if (logo_url !== undefined) {
+      if (logo_url && logo_url.length > 1000000) {
+        return res.status(400).json({ error: 'Profile photo is too large. Please use a smaller image (under 500KB).' });
+      }
+      updates.logo_url = logo_url;
+    }
+
+    // Handle portfolio — validate size
+    if (portfolio !== undefined) {
+      if (Array.isArray(portfolio)) {
+        const totalSize = JSON.stringify(portfolio).length;
+        if (totalSize > 4000000) {
+          return res.status(400).json({ error: 'Portfolio photos are too large. Please use smaller images or fewer photos.' });
+        }
+        updates.portfolio = portfolio;
+      }
+    }
 
     // Allow password change
     if (password !== undefined && password.length >= 8) {
@@ -35,18 +52,31 @@ router.put('/', authMiddleware, async (req, res) => {
       updates.password = await bcrypt.hash(password, 12);
     }
 
+    if (Object.keys(updates).length === 0) {
+      return res.json({ user: req.user });
+    }
+
+    console.log('[Profile] Updating fields:', Object.keys(updates).filter(k => k !== 'logo_url' && k !== 'portfolio'));
+
     const { data: user, error } = await supabase
       .from('users')
       .update(updates)
       .eq('id', req.user.id)
-      .select('id, name, email, role, phone, location, services, credits, bio, website, verified, verification_status, avg_rating, review_count, company_name, license_number, years_experience, business_email, address, country, service_areas, availability, logo_url, portfolio')
+      .select('id, name, email, role, phone, location, services, credits, bio, website, verified, verification_status, avg_rating, review_count, company_name, license_number, years_experience, business_email, address, country, service_areas, availability, logo_url, portfolio, created_at')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[Profile] Supabase error:', error.message, error.code);
+      if (error.code === '42703') {
+        return res.status(500).json({ error: 'Database column missing. Please run the latest database migration in Supabase.' });
+      }
+      return res.status(500).json({ error: 'Could not save profile. Please try again.' });
+    }
+
     res.json({ user });
   } catch (err) {
-    console.error('Profile update error:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('[Profile] Server error:', err.message);
+    res.status(500).json({ error: 'Server error. Please try again.' });
   }
 });
 
@@ -61,15 +91,13 @@ router.post('/verify', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'All verification fields are required' });
     }
 
-    // Get contractor info
     const { data: contractor } = await supabase
       .from('users')
       .select('name, email')
       .eq('id', req.user.id)
       .single();
 
-    // Update user with verification data
-    await supabase
+    const { error } = await supabase
       .from('users')
       .update({
         company_name,
@@ -79,7 +107,11 @@ router.post('/verify', authMiddleware, async (req, res) => {
       })
       .eq('id', req.user.id);
 
-    // Notify admin
+    if (error) {
+      console.error('[Verify] Error:', error.message);
+      return res.status(500).json({ error: 'Could not submit verification. Please try again.' });
+    }
+
     const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAIL;
     if (adminEmail) {
       sendEmail(adminEmail, 'verificationRequest', {
@@ -93,8 +125,8 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
     res.json({ success: true, message: 'Verification submitted successfully' });
   } catch (err) {
-    console.error('Verification error:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('[Verify] Server error:', err.message);
+    res.status(500).json({ error: 'Server error. Please try again.' });
   }
 });
 
@@ -104,7 +136,7 @@ router.patch('/verify/:userId', authMiddleware, async (req, res) => {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin only' });
     }
-    const { action } = req.body; // 'approve' or 'reject'
+    const { action } = req.body;
     const isApproved = action === 'approve';
 
     const { data: contractor } = await supabase
@@ -113,7 +145,7 @@ router.patch('/verify/:userId', authMiddleware, async (req, res) => {
       .eq('id', req.params.userId)
       .single();
 
-    await supabase
+    const { error } = await supabase
       .from('users')
       .update({
         verified: isApproved,
@@ -121,7 +153,11 @@ router.patch('/verify/:userId', authMiddleware, async (req, res) => {
       })
       .eq('id', req.params.userId);
 
-    // Notify contractor
+    if (error) {
+      console.error('[AdminVerify] Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
     if (contractor?.email) {
       sendEmail(contractor.email, isApproved ? 'verificationApproved' : 'verificationRejected', {
         name: contractor.name
@@ -130,7 +166,7 @@ router.patch('/verify/:userId', authMiddleware, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
