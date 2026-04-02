@@ -335,3 +335,20 @@ router.get('/paystack/verify/:reference', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+
+// ── PAYMENT HISTORY ──────────────────────────────
+router.get('/history', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .select('id, credits, amount_paid, description, payment_method, created_at')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    res.json({ transactions: data || [] });
+  } catch (err) {
+    console.error('Payment history error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
