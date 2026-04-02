@@ -201,3 +201,29 @@ router.post('/:id/unlock', authMiddleware, contractorOnly, async (req, res) => {
 });
 
 module.exports = router;
+
+// ── UPDATE JOB STATUS ─────────────────────────────
+router.put('/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const validStatuses = ['open', 'in_progress', 'completed', 'closed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const { data: job } = await supabase
+      .from('jobs').select('client_id').eq('id', req.params.id).single();
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (job.client_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    await supabase.from('jobs').update({ status }).eq('id', req.params.id);
+    // If completed, send review request email to client
+    if (status === 'completed') {
+      console.log(`[Job] Job ${req.params.id} marked completed`);
+    }
+    res.json({ success: true, status });
+  } catch (err) {
+    console.error('Job status update error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});

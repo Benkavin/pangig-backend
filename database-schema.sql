@@ -163,3 +163,42 @@ create table if not exists promo_codes (
 );
 create index if not exists idx_promo_codes_code on promo_codes(code);
 create index if not exists idx_promo_codes_used_by on promo_codes(used_by);
+
+-- ── MESSAGES ─────────────────────────────────────
+create table if not exists messages (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references jobs(id) on delete cascade,
+  sender_id uuid references users(id) on delete cascade,
+  recipient_id uuid references users(id) on delete cascade,
+  content text not null,
+  read boolean default false,
+  created_at timestamptz default now()
+);
+create index if not exists idx_messages_job_id on messages(job_id);
+create index if not exists idx_messages_sender on messages(sender_id);
+create index if not exists idx_messages_recipient on messages(recipient_id);
+
+-- ── DISPUTES ─────────────────────────────────────
+create table if not exists disputes (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references jobs(id) on delete cascade,
+  filed_by uuid references users(id) on delete cascade,
+  reason text not null,
+  status text default 'open',
+  resolution text,
+  resolved_at timestamptz,
+  created_at timestamptz default now()
+);
+create index if not exists idx_disputes_job_id on disputes(job_id);
+create index if not exists idx_disputes_filed_by on disputes(filed_by);
+
+-- ── ADD NEW COLUMNS TO USERS ──────────────────────
+alter table users add column if not exists business_email text;
+alter table users add column if not exists address text;
+alter table users add column if not exists country text;
+alter table users add column if not exists service_areas text;
+alter table users add column if not exists availability text default 'available';
+alter table users add column if not exists portfolio jsonb default '[]';
+
+-- ── ADD STATUS TO JOBS ────────────────────────────
+alter table jobs add column if not exists status text default 'open';

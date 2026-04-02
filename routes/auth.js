@@ -46,7 +46,7 @@ router.post('/signup', async (req, res) => {
         services: service ? [service] : [],
         created_at: new Date().toISOString()
       })
-      .select('id, name, email, role, phone, location, services, credits')
+      .select('id, name, email, role, phone, location, services, credits, bio, website, verified, verification_status, avg_rating, review_count, company_name, license_number, years_experience, business_email, address, country, service_areas, availability, logo_url, portfolio, created_at')
       .single();
 
     if (error) throw error;
@@ -141,7 +141,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     }
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, name, email, role, phone, location, services, credits, created_at')
+      .select('id, name, email, role, phone, location, services, credits, bio, website, verified, verification_status, avg_rating, review_count, company_name, license_number, years_experience, business_email, address, country, service_areas, availability, logo_url, portfolio, created_at')
       .eq('id', req.user.id)
       .single();
 

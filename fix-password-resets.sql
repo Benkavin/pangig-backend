@@ -11,7 +11,3 @@ create table password_resets (
 
 create index idx_password_resets_token on password_resets(token);
 create index idx_password_resets_user_id on password_resets(user_id);
-
--- Allow service role full access
-alter table password_resets enable row level security;
-create policy "service_role_all" on password_resets for all to service_role using (true);

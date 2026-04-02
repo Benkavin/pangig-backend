@@ -73,6 +73,8 @@ app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/reviews',  require('./routes/reviews'));
 app.use('/api/profile',  require('./routes/profile'));
 app.use('/api/promo',    require('./routes/promocodes'));
+app.use('/api/messages', require('./routes/messages'));
+app.use('/api/disputes', require('./routes/disputes'));
 
 // ── CONTACT FORM ──────────────────────────────────
 app.post('/api/contact', async (req, res) => {

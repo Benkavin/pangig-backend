@@ -271,6 +271,23 @@ const templates = {
     `)
   }),
 
+  // ── Dispute Filed ──────────────────────────
+  disputeFiled: ({ userName, userEmail, jobTitle, reason }) => ({
+    subject: `🚩 New dispute filed — ${jobTitle}`,
+    html: baseTemplate(`
+      ${h1('New dispute filed 🚩')}
+      ${highlight('Filed by', userName)}
+      ${highlight('Email', userEmail)}
+      ${highlight('Job', jobTitle)}
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;margin:12px 0;">
+        <div style="font-size:13px;color:#991b1b;margin-bottom:8px;font-weight:700;">Reason:</div>
+        <div style="font-size:14px;color:#7f1d1d;line-height:1.7;">${reason}</div>
+      </div>
+      ${highlight('Time', new Date().toLocaleString())}
+      ${btn('Review in Admin Panel', process.env.FRONTEND_URL || 'https://www.pangig.com')}
+    `)
+  }),
+
   // ── Contact Form ───────────────────────────
   contactForm: ({ name, email, subject, message }) => ({
     subject: `New contact form message: ${subject}`,

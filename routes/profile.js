@@ -7,7 +7,12 @@ const { sendEmail } = require('../config/email');
 // ── UPDATE PROFILE ───────────────────────────────
 router.put('/', authMiddleware, async (req, res) => {
   try {
-    const { name, bio, phone, location, website, services, password } = req.body;
+    const {
+      name, bio, phone, location, website, services, password,
+      business_email, address, country, service_areas,
+      years_experience, availability, logo_url, portfolio
+    } = req.body;
+
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (bio !== undefined) updates.bio = bio;
@@ -15,17 +20,28 @@ router.put('/', authMiddleware, async (req, res) => {
     if (location !== undefined) updates.location = location;
     if (website !== undefined) updates.website = website;
     if (services !== undefined) updates.services = services;
+    if (business_email !== undefined) updates.business_email = business_email;
+    if (address !== undefined) updates.address = address;
+    if (country !== undefined) updates.country = country;
+    if (service_areas !== undefined) updates.service_areas = service_areas;
+    if (years_experience !== undefined) updates.years_experience = years_experience ? parseInt(years_experience) : null;
+    if (availability !== undefined) updates.availability = availability;
+    if (logo_url !== undefined) updates.logo_url = logo_url;
+    if (portfolio !== undefined) updates.portfolio = portfolio;
+
     // Allow password change
     if (password !== undefined && password.length >= 8) {
       const bcrypt = require('bcryptjs');
       updates.password = await bcrypt.hash(password, 12);
     }
+
     const { data: user, error } = await supabase
       .from('users')
       .update(updates)
       .eq('id', req.user.id)
-      .select('id, name, email, role, phone, location, services, credits, bio, website, verified, verification_status, avg_rating, review_count, company_name, license_number, years_experience')
+      .select('id, name, email, role, phone, location, services, credits, bio, website, verified, verification_status, avg_rating, review_count, company_name, license_number, years_experience, business_email, address, country, service_areas, availability, logo_url, portfolio')
       .single();
+
     if (error) throw error;
     res.json({ user });
   } catch (err) {
