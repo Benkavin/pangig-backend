@@ -16,6 +16,107 @@ router.get('/packages', (req, res) => {
   res.json({ packages: CREDIT_PACKAGES });
 });
 
+// ── CREATE PAYMENT INTENT (in-app card payment) ──
+router.post('/stripe/payment-intent', authMiddleware, contractorOnly, async (req, res) => {
+  try {
+    const { package_id } = req.body;
+    const pkg = CREDIT_PACKAGES.find(p => p.id === package_id);
+    if (!pkg) return res.status(400).json({ error: 'Invalid package' });
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: (pkg.price_usd || pkg.price) * 100, // cents
+      currency: 'usd',
+      metadata: {
+        user_id: req.user.id,
+        package_id: pkg.id,
+        credits: pkg.credits.toString(),
+        package_name: pkg.label
+      },
+      description: `Pangig ${pkg.label} — ${pkg.credits} credits`,
+    });
+
+    res.json({
+      client_secret: paymentIntent.client_secret,
+      amount: pkg.price_usd || pkg.price,
+      credits: pkg.credits,
+      package_name: pkg.label
+    });
+  } catch (err) {
+    console.error('Payment intent error:', err);
+    res.status(500).json({ error: 'Could not initialize payment. Please try again.' });
+  }
+});
+
+// ── CONFIRM PAYMENT & ADD CREDITS ─────────────────
+router.post('/stripe/confirm', authMiddleware, contractorOnly, async (req, res) => {
+  try {
+    const { payment_intent_id, package_id } = req.body;
+    const pkg = CREDIT_PACKAGES.find(p => p.id === package_id);
+    if (!pkg) return res.status(400).json({ error: 'Invalid package' });
+
+    // Verify payment with Stripe
+    const paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id);
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ error: 'Payment not completed. Please try again.' });
+    }
+
+    // Check not already processed
+    const { data: existing } = await supabase
+      .from('credit_transactions')
+      .select('id')
+      .eq('stripe_payment_intent_id', payment_intent_id)
+      .single();
+    if (existing) {
+      return res.status(400).json({ error: 'This payment has already been processed.' });
+    }
+
+    // Get current user credits
+    const { data: user } = await supabase
+      .from('users')
+      .select('credits, name, email')
+      .eq('id', req.user.id)
+      .single();
+
+    const newCredits = (user.credits || 0) + pkg.credits;
+
+    // Add credits
+    await supabase.from('users')
+      .update({ credits: newCredits })
+      .eq('id', req.user.id);
+
+    // Log transaction
+    await supabase.from('credit_transactions').insert({
+      user_id: req.user.id,
+      type: 'purchase',
+      credits: pkg.credits,
+      amount_paid: pkg.price_usd || pkg.price,
+      description: `${pkg.label} package — ${pkg.credits} credits`,
+      stripe_payment_intent_id: payment_intent_id,
+      payment_method: 'stripe',
+      created_at: new Date().toISOString()
+    });
+
+    // Notify admin
+    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+      sendEmail(adminEmail, 'adminNewPayment', {
+        userName: user.name,
+        packageName: pkg.label,
+        credits: pkg.credits,
+        amountPaid: pkg.price_usd || pkg.price,
+        paymentMethod: 'Stripe'
+      });
+    }
+
+    console.log(`[Payment] ${user.name} purchased ${pkg.credits} credits ($${pkg.price_usd})`);
+    res.json({ success: true, new_balance: newCredits, credits_added: pkg.credits });
+
+  } catch (err) {
+    console.error('Confirm payment error:', err);
+    res.status(500).json({ error: 'Could not confirm payment.' });
+  }
+});
+
 // ══════════════════════════════════════════════════
 // STRIPE CHECKOUT
 // ══════════════════════════════════════════════════
@@ -34,13 +135,13 @@ router.post('/stripe/create-checkout', authMiddleware, contractorOnly, async (re
             name: `Pangig ${pkg.label} Credits`,
             description: `${pkg.credits} credits for unlocking contractor leads`,
           },
-          unit_amount: pkg.price_usd * 100, // cents
+          unit_amount: (pkg.price_usd || pkg.price) * 100, // cents
         },
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/payment-cancelled`,
+      success_url: `${process.env.FRONTEND_URL}?payment=success&credits=${pkg.credits}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}?payment=cancelled`,
       metadata: {
         user_id: req.user.id,
         package_id: pkg.id,
